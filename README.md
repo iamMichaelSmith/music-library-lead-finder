@@ -1,13 +1,77 @@
 # Music Library Lead Finder
 
-Music Library Lead Finder is a local-first crawler and review dashboard for discovering music library leads. It finds licensing catalogs, extracts contact signals (emails or forms), scores library relevance, and stores structured leads in DynamoDB for review. It does not send outreach.
+Local-first Python crawler + review dashboard for discovering music licensing library leads, extracting contact signals, and organizing results in DynamoDB for human review.
 
-## Requirements
-- Python 3.10+
-- AWS account (DynamoDB) or DynamoDB Local
-- AWS account (SQS optional, for queue-based scaling)
+> **Important:** This project is a research and qualification tool. It does **not** automatically send outreach.
 
-## Quickstart (Windows PowerShell)
+## Why this project exists
+
+Finding high-quality music library leads manually is slow and inconsistent.  
+This project speeds up lead discovery by:
+
+- Crawling targeted sites
+- Extracting contact signals (email / contact forms)
+- Scoring relevance
+- Storing structured lead records for review in a lightweight dashboard
+
+---
+
+## What this demonstrates (for employers)
+
+- Python data-pipeline engineering
+- Web crawling + HTML parsing
+- Heuristic scoring and deduplication
+- AWS service integration (DynamoDB, optional SQS)
+- FastAPI dashboarding for internal ops tools
+- Config-driven architecture and testable utility functions
+
+---
+
+## Architecture (high level)
+
+**Seeds / Discovery** -> **Crawler** -> **Signal Extraction + Scoring** -> **DynamoDB** -> **Review Dashboard**
+
+Optional scaling path: **Producer/Worker mode via SQS**
+
+---
+
+## Features
+
+- Seed-based crawl with optional search-provider discovery
+- Contact signal extraction (email/form/link)
+- Basic lead relevance scoring
+- Domain and page-level dedupe behavior
+- DynamoDB persistence for leads/pages
+- Review dashboard with authentication
+- Optional queue-based scaling with SQS
+- Environment-driven configuration (`.env`)
+
+---
+
+## Tech Stack
+
+- **Language:** Python 3.10+
+- **Core libs:** requests, BeautifulSoup, boto3, python-dotenv
+- **Dashboard:** FastAPI + Uvicorn + Jinja templates
+- **Storage:** AWS DynamoDB (or DynamoDB Local)
+- **Queue (optional):** AWS SQS
+- **Tests:** pytest
+
+---
+
+## Repository Layout
+
+- `run.py` - main crawler pipeline entrypoint
+- `dashboard_app.py` - internal review dashboard
+- `tests/test_core.py` - baseline utility tests
+- `seeds.txt` - crawl seed URLs
+- `queries.txt` - optional discovery queries
+- `requirements.txt` - runtime dependencies
+
+---
+
+## Quick Start (Windows PowerShell)
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt
@@ -15,7 +79,8 @@ copy .env.example .env
 .\.venv\Scripts\python run.py
 ```
 
-## Quickstart (Linux / Raspberry Pi)
+## Quick Start (Linux / Raspberry Pi)
+
 ```bash
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
@@ -23,140 +88,107 @@ cp .env.example .env
 ./.venv/bin/python run.py
 ```
 
-## Configure .env
-Start from `.env.example` and set at least:
-```
+---
+
+## Environment Configuration
+
+Start with `.env.example` and set at least:
+
+```env
 AWS_REGION=us-east-1
 LEADS_TABLE=MusicLibraryLeads
 PAGES_TABLE=MusicLibraryPages
-DASHBOARD_USERS=admin:changeme
+DASHBOARD_USERS=admin:change_me
 DASHBOARD_SESSION_SECRET=change_this_secret
 ```
 
-Optional (discovery):
-```
+Optional (discovery providers):
+
+```env
 DISCOVERY_ENABLED=1
 DISCOVERY_PROVIDERS=brave,serper
 BRAVE_API_KEY=your_key
 SERPER_API_KEY=your_key
 ```
 
-Optional (local DynamoDB):
-```
+Optional (DynamoDB local):
+
+```env
 DYNAMODB_ENDPOINT_URL=http://localhost:8000
 ```
 
-Optional (SQS queue for scaling):
-```
+Optional (queue mode / SQS):
+
+```env
 QUEUE_ENABLED=1
 QUEUE_MODE=producer   # producer | worker | local
-SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/your-queue
-SQS_MAX_MESSAGES=5
-SQS_WAIT_SECONDS=10
-SQS_VISIBILITY_TIMEOUT=30
-SQS_MESSAGE_GROUP_ID=leadbot
+SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/QUEUE
 ```
 
-## Dashboard
-The dashboard uses its own login (set in `DASHBOARD_USERS`) and is typically accessed locally.
+---
 
-Windows:
-```powershell
-.\.venv\Scripts\pip install -r requirements.txt
-.\run-dashboard.ps1
-```
+## Verification (clone-and-test checklist)
 
-Linux / Raspberry Pi:
-```bash
-./.venv/bin/python -m uvicorn dashboard_app:app --host 0.0.0.0 --port 8001
-```
+Use these steps to verify from a fresh pull:
 
-Open `http://localhost:8001` (or the port in `DASHBOARD_PORT`).
+1. **Install dependencies**
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\pip install -r requirements.txt
+   ```
 
-### Remote access (recommended: Tailscale)
-For private, simple access by a few people, use Tailscale instead of exposing the dashboard to the public internet.
+2. **Configure environment**
+   ```powershell
+   copy .env.example .env
+   ```
+   Then set required values.
 
-1) Install Tailscale on the host and each user's device.
-2) Sign in to the same tailnet and invite the other users.
-3) Share the Tailscale IP of the host (see `tailscale ip -4`), and use:
-```
-http://<tailscale-ip>:<DASHBOARD_PORT>
-```
+3. **Run unit tests**
+   ```powershell
+   .\.venv\Scripts\python -m pytest -q
+   ```
 
-Notes:
-- Tailscale controls network access; the dashboard still uses `DASHBOARD_USERS` for login.
-- No public ports or reverse proxy needed.
+4. **Smoke run crawler**
+   ```powershell
+   .\.venv\Scripts\python run.py
+   ```
+   Expected: process starts, crawls configured seeds, writes leads/pages records.
 
-## Services Used (and Why)
-- **DynamoDB**: durable lead storage, deduplication, and dashboard reads.
-- **SQS (optional)**: decouples crawling work so you can run multiple workers in parallel, buffer spikes, and scale safely.
-- **Brave/Serper (optional)**: discovery providers for finding new seed URLs.
+5. **Smoke run dashboard**
+   ```powershell
+   .\.venv\Scripts\python -m uvicorn dashboard_app:app --host 127.0.0.1 --port 8001
+   ```
+   Open `http://127.0.0.1:8001` and confirm login and lead listing.
 
-## AWS Setup (DynamoDB)
-Create the two tables:
-- `MusicLibraryLeads` (hash key: `lead_id` string)
-- `MusicLibraryPages` (hash key: `page_url` string)
+---
 
-Example (AWS CLI):
-```bash
-aws dynamodb create-table \
-  --region us-east-1 \
-  --table-name MusicLibraryLeads \
-  --attribute-definitions AttributeName=lead_id,AttributeType=S \
-  --key-schema AttributeName=lead_id,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
+## Security & Responsible Use
 
-aws dynamodb create-table \
-  --region us-east-1 \
-  --table-name MusicLibraryPages \
-  --attribute-definitions AttributeName=page_url,AttributeType=S \
-  --key-schema AttributeName=page_url,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
-```
+- Use this tool only on data you are authorized to process.
+- Respect robots directives, platform terms, and applicable laws.
+- Do not use this project for spam, harassment, or unauthorized scraping.
+- Keep credentials out of source control (`.env` should remain uncommitted).
 
-Make sure your AWS credentials are set (either `aws configure` or environment variables).
+---
 
-## AWS Setup (SQS, optional)
-Use SQS if you want queue-based scaling (producer → workers).
+## Known Limitations
 
-Create a queue (standard is fine) and copy the Queue URL into `SQS_QUEUE_URL`.
+- Current test coverage is utility-heavy; end-to-end coverage can be expanded.
+- Scoring is heuristic and may require tuning per niche.
+- Crawl quality depends on seed quality and provider signal quality.
+- Dynamic/JS-heavy sites may need stronger rendering support if expanded.
 
-### Modes
-- `QUEUE_MODE=producer`: enqueue seed URLs into SQS.
-- `QUEUE_MODE=worker`: pull URLs from SQS, crawl, and write leads to DynamoDB.
-- `QUEUE_MODE=local` or `QUEUE_ENABLED=0`: original single-process crawl.
+---
 
-### Example workflow
-1) Producer:
-```bash
-QUEUE_ENABLED=1
-QUEUE_MODE=producer
-python run.py
-```
-2) Worker (run one or many workers):
-```bash
-QUEUE_ENABLED=1
-QUEUE_MODE=worker
-python run.py
-```
+## Suggested Next Improvements
 
-## Seed Validation (optional)
-Validate and clean seed URLs:
-```bash
-python validate_seeds.py
-```
+- Split `run.py` into modular components (`crawler`, `scoring`, `storage`, `discovery`)
+- Add structured logging + trace IDs
+- Add integration tests for persistence and crawl flows
+- Add metrics/reporting (success rate, dedupe ratio, lead quality over time)
 
-Outputs:
-- `seeds_working.txt`
-- `seeds_failed.txt`
+---
 
-## Files and Outputs
-- `leads_export.jsonl` (optional export if enabled)
-- `discovery_state.json` (discovery progress)
-- `dashboard/` (templates and static assets)
+## License
 
-## Testing (optional)
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
+Add a license file (recommended: MIT) for clearer hiring-manager confidence and open-source clarity.

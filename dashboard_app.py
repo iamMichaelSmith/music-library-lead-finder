@@ -23,8 +23,8 @@ LEADS_TABLE = os.getenv("LEADS_TABLE", "MusicLibraryLeads")
 DYNAMODB_ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")
 DISABLE_PROXY = os.getenv("DASHBOARD_DISABLE_PROXY", "1").strip()
 
-if DISABLE_PROXY != "0":
-    # Avoid Windows/system proxy settings breaking AWS calls.
+def _disable_proxy_env() -> None:
+    """Clear proxy vars so local AWS calls are not routed through broken system proxies."""
     os.environ["HTTP_PROXY"] = ""
     os.environ["HTTPS_PROXY"] = ""
     os.environ["ALL_PROXY"] = ""
@@ -33,6 +33,11 @@ if DISABLE_PROXY != "0":
     os.environ["https_proxy"] = ""
     os.environ["all_proxy"] = ""
     os.environ["no_proxy"] = "*"
+
+
+if DISABLE_PROXY != "0":
+    # Avoid Windows/system proxy settings breaking AWS calls.
+    _disable_proxy_env()
 
 DASHBOARD_USERS = os.getenv("DASHBOARD_USERS", "").strip()
 DASHBOARD_SESSION_SECRET = os.getenv("DASHBOARD_SESSION_SECRET", "").strip()
@@ -43,6 +48,7 @@ if not DASHBOARD_SESSION_SECRET:
     raise RuntimeError("DASHBOARD_SESSION_SECRET is required for the dashboard.")
 
 def parse_users(raw: str) -> dict[str, str]:
+    """Parse DASHBOARD_USERS in the format 'user:pass,user2:pass2'."""
     users: dict[str, str] = {}
     if not raw:
         return users
@@ -95,6 +101,7 @@ def normalize_netloc(netloc: str) -> str:
     return host
 
 def require_user(request: Request) -> str | None:
+    """Return the authenticated username from session, if present."""
     return request.session.get("user")
 
 def scan_leads(limit: int, rotate_days: int) -> list[dict[str, Any]]:
