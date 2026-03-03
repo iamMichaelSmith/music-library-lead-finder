@@ -192,3 +192,24 @@ Use these steps to verify from a fresh pull:
 ## License
 
 Add a license file (recommended: MIT) for clearer hiring-manager confidence and open-source clarity.
+
+## Quality & CI
+This repo is set up for CI-driven reliability checks on every PR.
+
+Run this local preflight before push:
+```powershell
+.\.venv\Scripts\python -m ruff check .
+.\.venv\Scripts\python -m black --check .
+.\.venv\Scripts\python -m pytest -q
+```
+
+## Developer Tooling
+```powershell
+.\.venv\Scripts\pip install -r requirements-dev.txt
+.\.venv\Scripts\pre-commit install
+.\.venv\Scripts\pre-commit run --all-files
+```
+
+## Operational Docs
+- `docs/ARCHITECTURE.md`
+- `docs/PRODUCTION_RUNBOOK.md`
